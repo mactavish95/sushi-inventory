@@ -2,11 +2,9 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const ExcelJS = require('exceljs');
-
+const ExcelJS = require("exceljs");
 
 // import { findAllDatesAtLeastTenDaysAgo } from "./sr.js";
-
 
 const router = express.Router();
 
@@ -20,25 +18,6 @@ app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`, req.body);
   next();
 });
-
-// Schema and Models
-// const StockSchema = new mongoose.Schema({
-//   itemName: { type: String, required: true },
-//   type: { type: String, required: true, enum: ["in", "out"] },
-//   time: { type: Date, default: Date.now },
-//   quantity: { type: Number, required: true },
-//   imageUrl: String,
-// });
-
-// const Stock = mongoose.model("Stock", StockSchema);
-
-// const Item = mongoose.model("Item", new mongoose.Schema({
-//   itemName: { type: String, required: true },
-//   category: { type: String, required: true },
-//   quantity: { type: Number, required: true },
-//   createdAt: { type: Date, default: Date.now },
-//   imageUrl: String,
-// }));
 
 const StockSchema = new mongoose.Schema({
   itemName: { type: String, required: true },
@@ -54,7 +33,11 @@ const StockSchema = new mongoose.Schema({
 const Stock = mongoose.model("Stock", StockSchema);
 
 const ItemSchema = new mongoose.Schema({
-  itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stock', required: true },
+  itemId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Stock",
+    required: true,
+  },
   itemName: { type: String, required: true },
   quantity: { type: Number, required: true },
   imageUrl: String,
@@ -62,54 +45,50 @@ const ItemSchema = new mongoose.Schema({
 
 const Item = mongoose.model("Item", ItemSchema);
 
-
-const Activity = mongoose.model("Activity", new mongoose.Schema({
-  message: String,
-  time: { type: Date, default: Date.now },
-}));
-
+const Activity = mongoose.model(
+  "Activity",
+  new mongoose.Schema({
+    message: String,
+    time: { type: Date, default: Date.now },
+  })
+);
 
 mongoose
-  .connect("mongodb://localhost:27017/sushi_inventory", {
+  .connect("mongodb://127.0.0.1:27017/sushi_inventory", {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
   })
   .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => console.error("MongoDB connection error:", err));
-
-
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 app.post("/stock", async (req, res) => {
   try {
-    const { itemName, category, type, time, quantity, imageUrl  } = req.body;
+    const { itemName, category, type, time, quantity, imageUrl } = req.body;
 
-  
-      // Validate required fields
-      if (!itemName || !category || !type || !quantity) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
+    // Validate required fields
+    if (!itemName || !category || !type || !quantity) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
 
     // Validate required fields
     if (!itemName || !type || !quantity) {
-      return res.status(400).json({ 
-        error: 'Missing required fields' 
+      return res.status(400).json({
+        error: "Missing required fields",
       });
     }
 
-  
-
     // Validate type enum
-    if (!['in', 'out'].includes(type)) {
-      return res.status(400).json({ 
-        error: 'Invalid type. Must be "in" or "out"' 
+    if (!["in", "out"].includes(type)) {
+      return res.status(400).json({
+        error: 'Invalid type. Must be "in" or "out"',
       });
     }
 
     // Convert quantity to number safely
     const number = parseInt(quantity);
     if (isNaN(number)) {
-      return res.status(400).json({ 
-        error: 'Quantity must be a valid number' 
+      return res.status(400).json({
+        error: "Quantity must be a valid number",
       });
     }
 
@@ -121,10 +100,10 @@ app.post("/stock", async (req, res) => {
       existingItem.quantity += number;
       existingItem.time = new Date();
       await existingItem.save();
-      
+
       return res.status(200).json({
-        message: 'Item updated successfully',
-        item: existingItem
+        message: "Item updated successfully",
+        item: existingItem,
       });
     }
 
@@ -137,19 +116,18 @@ app.post("/stock", async (req, res) => {
       quantity,
       imageUrl,
     });
-    
-    await stock.save();
-    
-    // return res.status(201).json({
-    //   message: 'Item added successfully',
-    //   item: newItem
-    // });
 
+    const savedStock = await stock.save();
+
+    return res.status(201).json({
+      message: "Item added successfully",
+      item: savedStock,
+    });
   } catch (error) {
-    console.error('Stock operation error:', error);
+    console.error("Stock operation error:", error);
     return res.status(500).json({
-      error: 'Failed to process stock operation',
-      details: error.message
+      error: "Failed to process stock operation",
+      details: error.message,
     });
   }
 });
@@ -162,49 +140,140 @@ app.get("/stock", async (req, res) => {
     res.status(200).json(stocks);
   } catch (error) {
     console.error("Error fetching stocks:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to fetch stock entries",
-      details: error.message 
+      details: error.message,
     });
   }
 });
 
-app.get('/export/monthly', async (req, res) => {
+app.get("/stock", async (req, res) => {
+  try {
+    const stocks = await Stock.find();
+
+    // Add expiry check for seafood items
+    const stocksWithWarning = stocks.map((stock) => {
+      const stockObj = stock.toObject();
+      if (stock.category === "seafood") {
+        const itemDate = new Date(stock.time);
+        const currentDate = new Date();
+        const diffTime = Math.abs(currentDate - itemDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 14) {
+          stockObj.warning = `Warning: This seafood item is ${diffDays} days old`;
+        }
+      }
+      return stockObj;
+    });
+
+    res.status(200).json(stocksWithWarning);
+  } catch (error) {
+    console.error("Error fetching stocks:", error);
+    res.status(500).json({
+      error: "Failed to fetch stock entries",
+      details: error.message,
+    });
+  }
+});
+
+app.put("/stock/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quantity } = req.body;
+
+    if (!id || quantity === undefined) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const updatedItem = await Stock.findByIdAndUpdate(
+      id,
+      { quantity: quantity },
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    // Check if the item is seafood and the date is more than 2 weeks
+    let warningMessage = null;
+    if (updatedItem.category === "seafood") {
+      const itemDate = new Date(updatedItem.time);
+      const currentDate = new Date();
+      const diffTime = Math.abs(currentDate - itemDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 14) {
+        warningMessage = `Warning: This seafood item is ${diffDays} days old`;
+      }
+    }
+
+    // Log activity
+    const activity = new Activity({
+      message: `Updated quantity of ${updatedItem.itemName} to ${quantity}`,
+      time: new Date(),
+    });
+    await activity.save();
+
+    // Trigger refresh by sending refresh signal
+    return res.status(200).json({
+      message: "Quantity updated successfully",
+      item: updatedItem,
+      refresh: true,
+      warning: warningMessage,
+    });
+  } catch (error) {
+    console.error("Error updating quantity:", error);
+    return res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/export/monthly", async (req, res) => {
   // Fetch data from the database (replace with your DB query)
   const stockData = await Stock.find();
 
   // Create workbook and worksheet
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Monthly Record');
+  const worksheet = workbook.addWorksheet("Monthly Record");
 
   // Add header row
   worksheet.columns = [
-      { header: 'Item Name', key: 'itemName', width: 25 },
-      { header: 'Type', key: 'type', width: 15 },
-      { header: 'Quantity', key: 'quantity', width: 10 },
-      { header: 'Date Added', key: 'time', width: 20 },
+    { header: "Item Name", key: "itemName", width: 25 },
+    { header: "Type", key: "type", width: 15 },
+    { header: "Quantity", key: "quantity", width: 10 },
+    { header: "Date Added", key: "time", width: 20 },
   ];
 
   // Add data rows
   stockData.forEach((stock) => {
-      worksheet.addRow({
-          itemName: stock.itemName,
-          type: stock.type,
-          quantity: stock.quantity,
-          time: new Date(stock.time).toLocaleString(),
-      });
+    worksheet.addRow({
+      itemName: stock.itemName,
+      type: stock.type,
+      quantity: stock.quantity,
+      time: new Date(stock.time).toLocaleString(),
+    });
   });
 
   // Set response headers and send file
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=MonthlyRecord.xlsx');
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=MonthlyRecord.xlsx"
+  );
 
   await workbook.xlsx.write(res);
   res.end();
 });
 
 // find all items have the time in storage more than or equal to 10 days ago
-app.get('/stock/10days', async (req, res) => {
+app.get("/stock/10days", async (req, res) => {
   try {
     // Calculate the date 10 days ago from today
     const tenDaysAgo = new Date();
@@ -221,7 +290,9 @@ app.get('/stock/10days', async (req, res) => {
   } catch (error) {
     // Handle any errors that occur during the database query
     console.error("Error fetching stock:", error);
-    res.status(500).json({ error: "Failed to fetch stock items", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch stock items", details: error.message });
   }
 });
 
@@ -232,23 +303,28 @@ router.get("/summary", async (req, res) => {
       { $match: { type: "in" } },
       { $group: { _id: null, total: { $sum: "$quantity" } } },
     ]);
-    const outOfStockCount = await Stock.find({ quantity: { $lte: 0 } }).countDocuments();
+    const outOfStockCount = await Stock.find({
+      quantity: { $lte: 0 },
+    }).countDocuments();
     res.json({
       totalInStock: totalInStock[0]?.total || 0,
       outOfStock: outOfStockCount,
     });
   } catch (err) {
     console.error("Error fetching stock summary:", err);
-    res.status(500).json({ error: "Failed to fetch stock summary", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to fetch stock summary", details: err.message });
   }
 });
-
 
 app.get("/stock/dashboard-stats", async (req, res) => {
   try {
     const totalItems = await Stock.countDocuments();
     const lowStock = await Stock.countDocuments({ quantity: { $lt: 10 } });
-    const totalCategories = await Stock.distinct("category").then((categories) => categories.length);
+    const totalCategories = await Stock.distinct("category").then(
+      (categories) => categories.length
+    );
     const expiredItems = await Stock.countDocuments({
       createdAt: { $lt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000) }, // Items older than 10 days
     });
@@ -307,7 +383,6 @@ app.get("/stock/recent-activities", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch recent activities." });
   }
 });
-
 
 // Start server
 const PORT = 5000;

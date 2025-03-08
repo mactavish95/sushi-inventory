@@ -1,91 +1,6 @@
-// import { createSignal, onMount } from "solid-js";
-
-// const Dashboard = () => {
-//   const [stocks, setStocks] = createSignal([]);
-//   const [oldItems, setOldItems] = createSignal([]);
-
-//   const downloadMonthlyReport = () => {
-//     window.open('http://localhost:5000/export/monthly', '_blank');
-// };
-
-//   const fetchData = async () => {
-//     try {
-//       const response = await fetch("http://localhost:5000/stock"); // Corrected endpoint
-//       if (!response.ok) throw new Error(`Error: ${response.status}`);
-//       const data = await response.json();
-//       setStocks(data);
-//     } catch (error) {
-//       console.error("Error fetching dashboard data:", error);
-//     }
-//   };
-
-
-//   const fetchOldItems = async () => {
-//       try {
-//           const response = await fetch('http://localhost:5000/stock/10days');
-//           const data = await response.json();
-//           setOldItems(data);
-//       } catch (error) {
-//           console.error('Error fetching reminders:', error);
-//       }
-//   };
-
-//   onMount(() => {
-//       fetchOldItems();
-//   });
-
-
-
-//   onMount(() => {
-//     fetchData();
-//   });
-
-//   return (
-//     <div>
-//       <h1>Inventory Dashboard</h1>
-//       <table>
-//         <thead>
-//           <tr>
-//             <th>Item Name</th>
-//             <th>Type</th>
-//             <th>Quantity</th>
-//             <th>Time</th>
-//           </tr>
-//         </thead>
-//         <tbody>
-//           <For each={stocks()}>
-//             {(stock) => (
-//               <tr>
-//                 <td>{stock.itemName}</td>
-//                 <td>{stock.type}</td>
-//                 <td>{stock.quantity}</td>
-//                 <td>{new Date(stock.time).toLocaleString()}</td>
-//               </tr>
-//             )}
-//           </For>
-//         </tbody>
-//       </table>
-//       <div>
-//         <h2>Items Stored for More Than 10 Days</h2>
-//         <ul>
-//             <For each={oldItems()}>
-//                 {(item) => (
-//                     <li>
-//                         {item.itemName} - {new Date(item.time).toLocaleDateString()}
-//                     </li>
-//                 )}
-//             </For>
-//         </ul>
-//     </div>
-//       <button onClick={downloadMonthlyReport}>Download Monthly Report</button>
-//     </div>
-//   );
-// };
-
-// export default Dashboard;
-
-
 import { createSignal, onMount } from "solid-js";
+import Chart from "chart.js/auto";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import "./DashBoard.css";
 
 const Dashboard = () => {
@@ -98,25 +13,103 @@ const Dashboard = () => {
 
   const [stockTrends, setStockTrends] = createSignal([]);
   const [categories, setCategories] = createSignal([]);
+  const [groupedByCategory, setGroupedByCategory] = createSignal({});
   const [recentActivities, setRecentActivities] = createSignal([]);
 
+  const fetchData = async () => {
+    try {
+      const resStats = await fetch(
+        "http://localhost:5000/stock/dashboard-stats"
+      );
+      const dataStats = await resStats.json();
+      setStats(dataStats.stats);
+
+      const resTrends = await fetch("http://localhost:5000/stock/stock-trends");
+      const dataTrends = await resTrends.json();
+      setStockTrends(dataTrends.trends);
+
+      const resCategories = await fetch("http://localhost:5000/stock");
+      const dataCategories = await resCategories.json();
+      setCategories(dataCategories);
+
+      const resActivities = await fetch(
+        "http://localhost:5000/stock/recent-activities"
+      );
+      const dataActivities = await resActivities.json();
+      setRecentActivities(dataActivities.activities);
+
+      // Group items by category
+      const grouped = dataCategories.reduce((acc, item) => {
+        if (!acc[item.category]) {
+          acc[item.category] = [];
+        }
+        acc[item.category].push(item);
+        return acc;
+      }, {});
+      setGroupedByCategory(grouped);
+
+      // Render category distribution chart for each category after data is fetched
+      Object.keys(grouped).forEach((category, index) => {
+        const ctx = document
+          .getElementById(`categoryChart${index}`)
+          .getContext("2d");
+        new Chart(ctx, {
+          type: "pie",
+          data: {
+            labels: grouped[category].map((item) => item.itemName),
+            datasets: [
+              {
+                label: "Item Distribution",
+                data: grouped[category].map((item) => item.quantity),
+                backgroundColor: [
+                  "#FF6384",
+                  "#36A2EB",
+                  "#FFCE56",
+                  "#4BC0C0",
+                  "#9966FF",
+                  "#FF9F40",
+                ],
+                borderColor: [
+                  "#FF6384",
+                  "#36A2EB",
+                  "#FFCE56",
+                  "#4BC0C0",
+                  "#9966FF",
+                  "#FF9F40",
+                ],
+                borderWidth: 1,
+              },
+            ],
+          },
+          plugins: [ChartDataLabels],
+          options: {
+            plugins: {
+              datalabels: {
+                formatter: (value, context) => {
+                  const total = context.chart.data.datasets[0].data.reduce(
+                    (a, b) => a + b,
+                    0
+                  );
+                  const percentage = ((value / total) * 100).toFixed(2) + "%";
+                  return percentage;
+                },
+                color: "#fff",
+                font: {
+                  weight: "bold",
+                },
+              },
+            },
+          },
+        });
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    }
+  };
+
   onMount(() => {
-    // Fetch stats, trends, categories, and activities from API
-    fetch("http://localhost:5000/stock/dashboard-stats")
-      .then((res) => res.json())
-      .then((data) => setStats(data.stats));
-
-    fetch("/api/stock-trends")
-      .then((res) => res.json())
-      .then((data) => setStockTrends(data.trends));
-
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => setCategories(data.categories));
-
-    fetch("/api/recent-activities")
-      .then((res) => res.json())
-      .then((data) => setRecentActivities(data.activities));
+    fetchData();
+    window.refreshDashboard = fetchData;
   });
 
   return (
@@ -153,11 +146,12 @@ const Dashboard = () => {
       {/* Category Distribution Section */}
       <div class="category-distribution">
         <h2>Category Distribution</h2>
-        <ul>
-          {categories().map((category) => (
-            <li>{category.name}: {category.count} items</li>
-          ))}
-        </ul>
+        {Object.keys(groupedByCategory()).map((category, index) => (
+          <div key={index}>
+            <h3>{category}</h3>
+            <canvas id={`categoryChart${index}`}></canvas>
+          </div>
+        ))}
       </div>
 
       {/* Recent Activities Section */}
@@ -165,10 +159,7 @@ const Dashboard = () => {
         <h2>Recent Activities</h2>
         <ul>
           {recentActivities().map((activity) => (
-            <li>
-              <p>{activity.message}</p>
-              <small>{activity.time}</small>
-            </li>
+            <li key={activity._id}>{activity.message}</li>
           ))}
         </ul>
       </div>

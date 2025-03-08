@@ -33,7 +33,7 @@ export function StockIn() {
       };
 
       const response = await axios.post(
-        "sushi-backend-production.up.railway.app/5000/stock",
+        "sushi-backend-production.up.railway.app/stock",
         formData
       );
 

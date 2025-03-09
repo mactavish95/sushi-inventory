@@ -86,7 +86,7 @@ export function StockList() {
       const newQuantity = stock.quantity + change;
       if (newQuantity >= 0) {
         const response = await axios.put(
-          `http://localhost:5000/stock/${stock._id}`,
+          `sushi-backend-production.up.railway.app/${stock._id}`,
           {
             quantity: newQuantity,
           }
@@ -113,7 +113,9 @@ export function StockList() {
 
   const fetchStockData = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/stock");
+      const response = await axios.get(
+        "sushi-backend-production.up.railway.app/stock"
+      );
       const data = Array.isArray(response.data) ? response.data : [];
       setStockList(data);
     } catch (error) {

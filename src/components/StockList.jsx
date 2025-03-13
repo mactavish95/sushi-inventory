@@ -61,7 +61,7 @@ export function StockList() {
   const updateQuantity = async (itemId, newQuantity) => {
     try {
       const response = await axios.put(
-        `http://localhost:5000/stock/${itemId}`,
+        `https://sushi-backend-production.up.railway.app/stock/${itemId}`,
         {
           quantity: newQuantity,
         }
@@ -86,7 +86,7 @@ export function StockList() {
       const newQuantity = stock.quantity + change;
       if (newQuantity >= 0) {
         const response = await axios.put(
-          `sushi-backend-production.up.railway.app/${stock._id}`,
+          `https://sushi-backend-production.up.railway.app/${stock._id}`,
           {
             quantity: newQuantity,
           }
@@ -114,9 +114,11 @@ export function StockList() {
   const fetchStockData = async () => {
     try {
       const response = await axios.get(
-        "sushi-backend-production.up.railway.app/stock"
+        "https://sushi-backend-production.up.railway.app/stock"
       );
+      console.log(response.data);
       const data = Array.isArray(response.data) ? response.data : [];
+      console.log(data);
       setStockList(data);
     } catch (error) {
       console.error("Error fetching stock:", error);

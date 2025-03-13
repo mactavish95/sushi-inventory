@@ -33,11 +33,12 @@ export function StockIn() {
       };
 
       const response = await axios.post(
-        "sushi-backend-production.up.railway.app/stock",
+        "https://sushi-backend-production.up.railway.app/stock",
         formData
       );
 
       alert(response.data.message);
+      console.log(response.data);
       if (response.status === 201) {
         // Refresh the page after successful submission
         window.location.reload();
